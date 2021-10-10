@@ -380,7 +380,7 @@ async function dojob() {
                 const $ = cherrio.load(result);
 
 
-
+                var questionsDetected = [];
                 $(`div.contentRow`).each(function() {
                     try {
                         if ($(this).find('a').text().trim().length > 10) {
@@ -459,7 +459,7 @@ async function dojob() {
                                 }
                             } catch (e) { sentence1 = []; }
 
-                            var questionsDetected = [];
+
                             for (var i = 0; i < all.length; i++) {
                                 var keywordsBySpace = checkQuestionfor.split(" ");
                                 for (var j = 0; j < keywordsBySpace.length; j++) {
@@ -469,13 +469,7 @@ async function dojob() {
                                 }
 
                             }
-                            if (questionsDetected.length > 0) {
-                                questionsDetected = [...new Set(questionsDetected)];
-                            }
-                            for (let i = 0, l = questionsDetected.length; i < l; i++) {
-                                write_detectedquestion.write(`${all[i]}\r\n`);
-                                logger.success(`New question detected. Added.`);
-                            }
+
 
                             // match lowercase strinf str.replace(str.charAt(0), "");
                         }
@@ -484,6 +478,15 @@ async function dojob() {
                         return false;
                     }
                 });
+                if (questionsDetected.length > 0) {
+                    questionsDetected = [...new Set(questionsDetected)];
+                    logger.success(`New question detected. Added.`);
+                }
+                for (let i = 0, l = questionsDetected.length; i < l; i++) {
+                    write_detectedquestion.write(`${questionsDetected[i]}\r\n`);
+
+                }
+
             }
         } catch (error) {
             errorfunc(error.message);
