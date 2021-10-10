@@ -240,9 +240,9 @@ async function dojob() {
             return false;
         }
     }
-
+    await page.evaluateOnNewDocument(helper.headlessdetect);
     await page.setCacheEnabled(false);
-    await page.setDefaultTimeout(120000)
+    await page.setDefaultTimeout(120000);
     var client = await page.target().createCDPSession();
     for (var i = 0; i < urls.length; i++) {
         try {
