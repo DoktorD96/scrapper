@@ -241,6 +241,9 @@ async function dojob() {
         }
     }
     await page.evaluateOnNewDocument(helper.headlessdetect);
+    await page.setUserAgent(
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.81 Safari/537.36'
+    )
     await page.setCacheEnabled(false);
     await page.setDefaultTimeout(120000);
     var client = await page.target().createCDPSession();
