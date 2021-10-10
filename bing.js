@@ -293,7 +293,7 @@ async function dojob() {
 
                 var checkQuestionfor = urlswithpages[i].key;
 
-                await page.goto(`${urlswithpages[i].url}&first=${((k * 50) - 1) > 0 ? ((k * 50) - 1) : 0}&num=50`, { waitUntil: 'networkidle2' });
+                await page.goto(`${urlswithpages[i].url}&first=${((k * 50) - 1) > 0 ? ((k * 50) - 1) : 0}&count=50`, { waitUntil: 'networkidle2' });
                 await helper.sleep(5);
                 await page.waitForSelector(`body`);
 
