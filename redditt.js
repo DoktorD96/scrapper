@@ -26,7 +26,7 @@ https://stackexchange.com/search?q=keyword
 
 
 var CONFIG = {};
-CONFIG.base_url = `https://www.quora.com/search?q=`;
+CONFIG.base_url = `https://www.reddit.com/search/?q=`;
 //CONFIG.questions = ["how", "who", "where", "why", "how", "what"];
 //CONFIG.adjectives = ["tip", "trick", "secret", "revealed", "best", "way", "method"];
 CONFIG.targets = ["affiliate", "money", "income", "passive income", "recurring income"];
@@ -154,7 +154,7 @@ async function dojob() {
     try {
         await page.evaluate(({}) => {
             function remove_scrapped_elements() {
-                var data1 = $("div.CssComponent-sc-1oskqb9-0.cXjXFI[scrapedd]");
+                var data1 = $(`div[data-testid="post-container"][scrapedd]`);
                 if (data1.length > 400) {
                     data1.slice(0, 350).remove();
                 }
@@ -163,16 +163,19 @@ async function dojob() {
 
             setInterval(() => {
 
-                var data1 = $("div.CssComponent-sc-1oskqb9-0.cXjXFI:not([scrapedd])");
+                var data1 = $(`div[data-testid="post-container"]:not([scrapedd])`);
 
                 if (data1.length > 0) {
                     for (var i = 0, l = parseInt(data1.length); i < l; i++) {
                         try {
                             var title = $(data1[i]).find(`a[href]:first`).text().trim();
                             var link = $(data1[i]).find(`a[href]:first`).attr("href").trim();
-                            var text = $(data1[i]).find(`div.q-relative.spacing_log_answer_content`).text().trim();
-                            if (title.length > 10 && link.length > 10 && text.length > 10) {
-                                nodeLog({ title: title, text: text, link: link });
+                            var time = $(data1[i]).find(`a[data-click-id="timestamp"]:first`).text().trim();
+                            var comm = $(data1[i]).find(`a[data-click-id="comments"]:first`).text().trim();
+                            comm = comm.toLowerCase().replace(`comment`).replace(`s`);
+                            comm = parseInt(comm);
+                            if (title.length > 10 && link.length > 10 && time.length > 10) {
+                                nodeLog({ title: title, link: link, time: time, comm: comm });
                             }
 
                         } catch (e) {}

@@ -1,1 +1,6 @@
-testing
+.bat
+/node_modules
+/CONFIG
+/OUTPUT
+/BINSCRIPTS
+
