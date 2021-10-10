@@ -310,7 +310,7 @@ async function dojob() {
 
 
     console.clear();
-    console.log(`\n\n${logger.colors.e1.brGreen}Generated${logger.colors.e1.reset} ${logger.colors.e1.brBlue} ALL URLS${logger.colors.e1.reset}`);
+    console.log(`${logger.colors.e1.brGreen}Generated${logger.colors.e1.reset} ${logger.colors.e1.brBlue} ALL URLS${logger.colors.e1.reset}`);
 
     await helper.sleep(7);
 
@@ -318,19 +318,19 @@ async function dojob() {
 
     for (var i = 0, l = urlswithpages.length; i < l; i++) {
         //finalurls
-        try {
-            console.log(urlswithpages[i].url);
-            await client.send('Network.clearBrowserCookies');
-            await client.send('Network.clearBrowserCache');
-            await client.send('Network.setCacheDisabled', {
-                cacheDisabled: true,
-            });
 
-            await page.goto(urlswithpages[i].url, { waitUntil: 'networkidle2' });
-            var checkQuestionfor = urlswithpages[i].key;
-            var globalURL = "";
-            for (var j = 0, l1 = urlswithpages[i].pages; j < l1; j++) {
+        console.log(urlswithpages[i].url);
+        await client.send('Network.clearBrowserCookies');
+        await client.send('Network.clearBrowserCache');
+        await client.send('Network.setCacheDisabled', {
+            cacheDisabled: true,
+        });
 
+        await page.goto(urlswithpages[i].url, { waitUntil: 'networkidle2' });
+        var checkQuestionfor = urlswithpages[i].key;
+        var globalURL = "";
+        for (var j = 0, l1 = urlswithpages[i].pages; j < l1; j++) {
+            try {
                 if (j === 0) {
 
                     await page.goto(urls[i].search, { waitUntil: 'networkidle2' });
@@ -369,8 +369,8 @@ async function dojob() {
                     });
 
                 } else {
-                    console.log(`${globalURL}&page=${j}`);
-                    await page.goto(`${globalURL}&page=${j}`, { waitUntil: 'networkidle2' });
+                    console.log(`${globalURL}&page=${(j + 1)}`);
+                    await page.goto(`${globalURL}&page=${(j + 1)}`, { waitUntil: 'networkidle2' });
                     await helper.sleep(5);
                     await page.waitForSelector(`body[data-template="search_results"]`);
                 }
@@ -463,9 +463,22 @@ async function dojob() {
                             for (var i = 0; i < all.length; i++) {
                                 var keywordsBySpace = checkQuestionfor.split(" ");
                                 for (var j = 0; j < keywordsBySpace.length; j++) {
-                                    if (all[i].indexOf(`?`) > -1 && all[i].toLowerCase().indexOf(keywordsBySpace[j].trim()) > -1) {
-                                        questionsDetected.push(all[i]);
+                                    try {
+
+                                        if (all[i].indexOf(`?`) > -1 // if there is question mark
+                                            &&
+                                            all[i].toLowerCase().indexOf(keywordsBySpace[j].trim()) > -1 // if seo, youtube egx.
+                                            &&
+                                            all[i].charAt(0).match(/^[A-Z]/gm) != null // if first letter is Uppercase
+                                            &&
+                                            all[i].charAt(all[i].length - 1) == `?` // last part of string is question
+                                        ) {
+                                            questionsDetected.push(all[i]);
+                                        }
+                                    } catch (e) {
+
                                     }
+
                                 }
 
                             }
@@ -486,19 +499,20 @@ async function dojob() {
                     write_detectedquestion.write(`${questionsDetected[i]}\r\n`);
 
                 }
-
+            } catch (error) {
+                errorfunc(error.message);
+                return false;
             }
-        } catch (error) {
-            errorfunc(error.message);
-            return false;
+
         }
+
         await helper.sleep(5);
     }
     try {
         console.clear();
         await page.close();
         await browser.close();
-        console.log(`\n\n`);
+
         logger.success(`All JOBS DONE.\nSTATUS: Scrapping complete.`);
     } catch (error) {
         errorfunc(error.message);
