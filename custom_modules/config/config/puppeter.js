@@ -1,5 +1,7 @@
 module.exports = {
+    ignoreDefaultArgs: ["--disable-extensions"],
     headless: true,
+    //devtools: true,
     ignoreHTTPSErrors: true,
     args: [
         "--disable-notifications",
