@@ -9,7 +9,7 @@ var browser = null;
 var page = null;
 const fs = require('fs-extra');
 const path = require('path');
-const outputpath = "quora.com";
+const outputpath = "reddit.com";
 
 
 //# CUSTOM MODULES
@@ -18,7 +18,7 @@ const devices = require('./custom_modules/devicehelper.js');
 const helper = require('./custom_modules/helper.js');
 const jquery = require('./custom_modules/jquery.js');
 const logger = require('./custom_modules/logger.js');
-const customconfig = require(`${config.server.server.config}\\quora.js`);
+const customconfig = require(`${config.server.server.config}\\reditt.js`);
 var checkQuestionfor = "";
 var questionsDetected = [];
 /*
@@ -154,9 +154,29 @@ async function dojob() {
 
     var urls = [];
 
+
+
+
+
     for (var i = 0; i < searchterms.length; i++) {
         urls.push({
-            search: `https://www.quora.com/search?q=${encodeURIComponent(searchterms[i].search)}`,
+            search: `https://www.reddit.com/search/?q=${encodeURIComponent(searchterms[i].search)}&type=link&sort=relevance`,
+            key: searchterms[i].key
+        });
+        urls.push({
+            search: `https://www.reddit.com/search/?q=${encodeURIComponent(searchterms[i].search)}&type=link&sort=comments`,
+            key: searchterms[i].key
+        });
+        urls.push({
+            search: `https://www.reddit.com/search/?q=${encodeURIComponent(searchterms[i].search)}&type=link&sort=new`,
+            key: searchterms[i].key
+        });
+        urls.push({
+            search: `https://www.reddit.com/search/?q=${encodeURIComponent(searchterms[i].search)}&type=link&sort=hot`,
+            key: searchterms[i].key
+        });
+        urls.push({
+            search: `https://www.reddit.com/search/?q=${encodeURIComponent(searchterms[i].search)}&type=link&sort=top`,
             key: searchterms[i].key
         });
     }
@@ -241,9 +261,7 @@ async function dojob() {
         for (var i2 = 0, l2 = msgdata.length; i2 < l2; i2++) {
             try {
                 if (msgdata[i2].title.length > -1 && msgdata[i2].text.length > -1 && msgdata[i2].link.length > -1) {
-                    if (msgdata[i2].text.length > 10) {
-                        msgdata[i2].text = msgdata[i2].text.substr(0, (msgdata[i2].text.length - 6)) + " ...";
-                    }
+
                     var o = {};
                     o.TITLE = ""; //placeholder
                     o.TEXT = ""; //placeholder
@@ -257,16 +275,8 @@ async function dojob() {
                         o.TITLE = o.TITLE.replace(/(·|—|—”|—"|—“|—')/gm, ".");
                         o.TITLE = o.TITLE.replace(/("|“|”)/gm, "");
                     } catch (e) {}
-
-                    // format text properly 
-                    try {
-                        o.TEXT = msgdata[i2].text;
-                        o.TEXT = o.TEXT.replace(/(\r\n|\n|\r|\t|\f|\v|\v |<br>|<br\/>|<BR>|<BR\/>)/gm, " ");
-                        o.TEXT = o.TEXT.replace(/(·|—|—”|—"|—“|—')/gm, ".");
-                        o.TEXT = o.TEXT.replace(/("|“|”)/gm, "");
-                    } catch (e) {}
-                    o.HREF = msgdata[i2].link;
-
+                    o.HREF = `https://www.reddit.com${msgdata[i2].link}`;
+                    o.TEXT = msgdata[i2].text;
                     try {
                         if (o.HREF.trim().length > 0) {
                             write_allinks.write(`${o.HREF}\r\n`);
@@ -336,7 +346,9 @@ async function dojob() {
                         }
                     }
                 }
-            } catch (err) {}
+            } catch (err) {
+
+            }
         }
         try {
             if (questionsDetected.length > 0) {
@@ -364,9 +376,28 @@ async function dojob() {
             checkQuestionfor = urls[i].key;
 
             await page.goto(urls[i].search, { waitUntil: 'networkidle2' });
-            await page.exposeFunction("nodeLog", nodelogmsg);
-            await helper.sleep(5);
+            try {
+                await page.exposeFunction("nodeLog", nodelogmsg);
+            } catch (e) {}
+            await helper.sleep(7);
             await page.waitForSelector(`body`);
+
+            var noresults = await page.evaluate(() => {
+                try {
+                    if (document.querySelectorAll(`div[data-testid="no-results"]`).length > 0) {
+                        return true;
+                    }
+                } catch (e) {
+                    return true;
+                }
+                return false;
+            });
+
+            if (noresults) {
+                logger.warn("No results on the page. Page skipped.");
+                await helper.sleep(10);
+                continue;
+            }
             var jcode = jquery.jcode;
 
             await page.evaluate(({ jcode }) => {
@@ -380,7 +411,7 @@ async function dojob() {
 
             await page.evaluate(({}) => {
                 function remove_scrapped_elements() {
-                    var data1 = $("div.qu-borderBottom[scrapped]");
+                    var data1 = $(`div[data-testid="post-container"][scrapped]`);
                     if (data1.length > 400) {
                         data1.slice(0, 350).remove();
                     }
@@ -398,8 +429,16 @@ async function dojob() {
                                 data1[i].setAttribute("scrapped", "true");
                                 var title = $(data1[i]).find(`a[href]:first`).text().trim();
                                 var link = $(data1[i]).find(`a[href]:first`).attr("href").trim();
+                                var text = "";
+                                try {
+                                    var time = $(data1[i]).find(`a[data-click-id="timestamp"]:first`).text().trim();
+                                    var comm = $(data1[i]).find(`a[data-click-id="comments"]:first`).text().trim();
+                                    comm = comm.toLowerCase().replace(`comment`).replace(`s`);
+                                    comm = parseInt(comm) > 0 ? parseInt(comm) : 0;
+                                    text = `TIME: ${time} COMMENTS: ${comm}`
+                                } catch (e) {}
                                 if (title.length > 10 && link.length > 10) {
-                                    senddata.push({ title: title, link: link });
+                                    senddata.push({ title: title, link: link, text: text });
                                 }
 
                             } catch (e) {}
