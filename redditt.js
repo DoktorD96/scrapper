@@ -452,7 +452,7 @@ async function dojob() {
                     window.scrollTo(0, 9e30);
                 }, 5000); //5 sec
             }, {});
-            await helper.sleep(720); // 12 min per keyword
+            await helper.sleep(120); // 2 min per keyword
         } catch (error) {
             errorfunc(error.message);
             return false;
