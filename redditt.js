@@ -21,14 +21,19 @@ const logger = require('./custom_modules/logger.js');
 const customconfig = require(`${config.server.server.config}\\reditt.js`);
 var checkQuestionfor = "";
 var questionsDetected = [];
-/*
-[
-detectedquestion.txt //All detected questions with removed duplicates.
-possiblequestions.txt // all sentences that qualify for questions but don't have ? sign
-allrawdata.txt
-allinks.txt
-]
-*/
+var USER_AGENT = customconfig.useragent;
+const getFileName = (searhterm) => {
+    try {
+        searhterm = searhterm.trim()
+        var date = new Date();
+        var filename = searhterm.toLowerCase().replace(/(<|>|:|\"|\'|\\|\/|\||\?>|\*|\=|\&|;|)/gmi, "");
+        filename = filename.replace(/\s/gmi, "_")
+        return filename;
+    } catch (e) {
+        return "";
+    }
+
+}
 
 const errorfunc = async(message) => {
     try {
@@ -39,24 +44,6 @@ const errorfunc = async(message) => {
 }
 
 async function dojob() {
-
-    const allrawdata = `${config.server.server.output}\\${outputpath}\\allrawdata.txt`;
-    const detectedquestion = `${config.server.server.output}\\${outputpath}\\detectedquestion.txt`;
-    //const possiblequestions = `${config.server.server.output}\\${outputpath}\\possiblequestions.txt`;
-    const allinks = `${config.server.server.output}\\${outputpath}\\allinks.txt`;
-
-
-    fs.ensureFileSync(allrawdata);
-    fs.ensureFileSync(detectedquestion);
-    //fs.ensureFileSync(possiblequestions);
-    fs.ensureFileSync(allinks);
-
-
-    const write_allrawdata = fs.createWriteStream(allrawdata, { flags: 'a' });
-    const write_detectedquestion = fs.createWriteStream(detectedquestion, { flags: 'a' });
-    //const write_possiblequestions = fs.createWriteStream(possiblequestions, { flags: 'a' });
-    const write_allinks = fs.createWriteStream(allinks, { flags: 'a' });
-
 
     var keywords = customconfig.seachterms.trim().toLowerCase();
     if (typeof keywords == null || keywords == null || keywords == "") {
@@ -243,9 +230,7 @@ async function dojob() {
         }
     }
     await page.evaluateOnNewDocument(helper.headlessdetect);
-    await page.setUserAgent(
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.81 Safari/537.36'
-    )
+    await page.setUserAgent(USER_AGENT);
     await page.setCacheEnabled(false);
     await page.setDefaultTimeout(120000);
     var client = await page.target().createCDPSession();
@@ -364,6 +349,19 @@ async function dojob() {
     }
 
     for (var i = 0, l = urls.length; i < l; i++) {
+
+        var filename = getFileName(urls[i].key);
+        filename = filename + "-" + new Date().toISOString().substr(0, 10) + "[Y,M,D]-" + outputpath;
+        var allrawdata = `${config.server.server.output}\\${outputpath}\\${filename}[raw].txt`;
+        var detectedquestion = `${config.server.server.output}\\${outputpath}\\${filename}[ques].txt`;
+        var allinks = `${config.server.server.output}\\${outputpath}\\${filename}[links].txt`;
+        fs.ensureFileSync(allrawdata);
+        fs.ensureFileSync(detectedquestion);
+        fs.ensureFileSync(allinks);
+        var write_allrawdata = fs.createWriteStream(allrawdata, { flags: 'a' });
+        var write_detectedquestion = fs.createWriteStream(detectedquestion, { flags: 'a' });
+        var write_allinks = fs.createWriteStream(allinks, { flags: 'a' });
+
         console.clear();
         try {
             console.log(urls[i].search);
@@ -410,6 +408,8 @@ async function dojob() {
             questionsDetected = [];
 
             await page.evaluate(({}) => {
+
+
                 function remove_scrapped_elements() {
                     var data1 = $(`div[data-testid="post-container"][scrapped]`);
                     if (data1.length > 400) {
@@ -417,18 +417,18 @@ async function dojob() {
                     }
                 }
 
-
                 setInterval(() => {
-
                     var senddata = [];
                     var data1 = $(`div[data-testid="post-container"]:not([scrapped])`);
+                    console.log(data1);
 
                     if (data1.length > 0) {
+
                         for (var i = 0, l = parseInt(data1.length); i < l; i++) {
                             try {
                                 data1[i].setAttribute("scrapped", "true");
-                                var title = $(data1[i]).find(`a[href]:first`).text().trim();
-                                var link = $(data1[i]).find(`a[href]:first`).attr("href").trim();
+                                var title = $(data1[i]).find(`a[href][data-click-id="body"]:first`).text().trim();
+                                var link = $(data1[i]).find(`a[href][data-click-id="body"]:first`).attr("href").trim();
                                 var text = "";
                                 try {
                                     var time = $(data1[i]).find(`a[data-click-id="timestamp"]:first`).text().trim();
@@ -446,13 +446,13 @@ async function dojob() {
                     }
                     remove_scrapped_elements();
                     nodeLog(senddata);
-                }, 30000); //0.5min
+                }, 25000); //0.5min
 
                 setInterval(() => {
                     window.scrollTo(0, 9e30);
                 }, 5000); //5 sec
             }, {});
-            await helper.sleep(120); // 2 min per keyword
+            await helper.sleep(180); // 3 min per keyword
         } catch (error) {
             errorfunc(error.message);
             return false;

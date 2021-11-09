@@ -21,14 +21,19 @@ const logger = require('./custom_modules/logger.js');
 const customconfig = require(`${config.server.server.config}\\quora.js`);
 var checkQuestionfor = "";
 var questionsDetected = [];
-/*
-[
-detectedquestion.txt //All detected questions with removed duplicates.
-possiblequestions.txt // all sentences that qualify for questions but don't have ? sign
-allrawdata.txt
-allinks.txt
-]
-*/
+var USER_AGENT = customconfig.useragent;
+const getFileName = (searhterm) => {
+    try {
+        searhterm = searhterm.trim()
+        var date = new Date();
+        var filename = searhterm.toLowerCase().replace(/(<|>|:|\"|\'|\\|\/|\||\?>|\*|\=|\&|;|)/gmi, "");
+        filename = filename.replace(/\s/gmi, "_")
+        return filename;
+    } catch (e) {
+        return "";
+    }
+
+}
 
 const errorfunc = async(message) => {
     try {
@@ -39,23 +44,6 @@ const errorfunc = async(message) => {
 }
 
 async function dojob() {
-
-    const allrawdata = `${config.server.server.output}\\${outputpath}\\allrawdata.txt`;
-    const detectedquestion = `${config.server.server.output}\\${outputpath}\\detectedquestion.txt`;
-    //const possiblequestions = `${config.server.server.output}\\${outputpath}\\possiblequestions.txt`;
-    const allinks = `${config.server.server.output}\\${outputpath}\\allinks.txt`;
-
-
-    fs.ensureFileSync(allrawdata);
-    fs.ensureFileSync(detectedquestion);
-    //fs.ensureFileSync(possiblequestions);
-    fs.ensureFileSync(allinks);
-
-
-    const write_allrawdata = fs.createWriteStream(allrawdata, { flags: 'a' });
-    const write_detectedquestion = fs.createWriteStream(detectedquestion, { flags: 'a' });
-    //const write_possiblequestions = fs.createWriteStream(possiblequestions, { flags: 'a' });
-    const write_allinks = fs.createWriteStream(allinks, { flags: 'a' });
 
 
     var keywords = customconfig.seachterms.trim().toLowerCase();
@@ -313,9 +301,7 @@ async function dojob() {
         }
     }
     await page.evaluateOnNewDocument(helper.headlessdetect);
-    await page.setUserAgent(
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.81 Safari/537.36'
-    )
+    await page.setUserAgent(USER_AGENT);
     await page.setCacheEnabled(false);
     await page.setDefaultTimeout(120000);
     var client = await page.target().createCDPSession();
@@ -442,6 +428,20 @@ async function dojob() {
     }
 
     for (var i = 0, l = urls.length; i < l; i++) {
+
+        var filename = getFileName(urls[i].key);
+        filename = filename + "-" + new Date().toISOString().substr(0, 10) + "[Y,M,D]-" + outputpath;
+        var allrawdata = `${config.server.server.output}\\${outputpath}\\${filename}[raw].txt`;
+        var detectedquestion = `${config.server.server.output}\\${outputpath}\\${filename}[ques].txt`;
+        var allinks = `${config.server.server.output}\\${outputpath}\\${filename}[links].txt`;
+        fs.ensureFileSync(allrawdata);
+        fs.ensureFileSync(detectedquestion);
+        fs.ensureFileSync(allinks);
+        var write_allrawdata = fs.createWriteStream(allrawdata, { flags: 'a' });
+        var write_detectedquestion = fs.createWriteStream(detectedquestion, { flags: 'a' });
+        var write_allinks = fs.createWriteStream(allinks, { flags: 'a' });
+
+
         console.clear();
         try {
             console.log(urls[i].search);

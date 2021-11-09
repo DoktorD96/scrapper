@@ -22,35 +22,35 @@ const jquery = require('./custom_modules/jquery.js');
 const logger = require('./custom_modules/logger.js');
 const { resolve } = require('path');
 const customconfig = require(`${config.server.server.config}\\stack.js`);
+var USER_AGENT = customconfig.useragent;
 
-/*
-[
-detectedquestion.txt //All detected questions with removed duplicates.
-possiblequestions.txt // all sentences that qualify for questions but don't have ? sign
-allrawdata.txt
-allinks.txt
-]
-*/
 
-/*
-    customconfig.c2captchaApiKey: "22bc2ed421bf61bae2c5c68962015fd0",
-    customconfig.cAntiCaptchaApiKey: "46ed188b494d6d6af5d3023c4ecabeea",
-    customconfig.websiteKey: "6Lfmm70ZAAAAADvPzM6OhZ8Adi40-78E-aYfc1ZS",
-    customconfig.captchaprovider
-*/
 
+const getFileName = (searhterm) => {
+    try {
+        searhterm = searhterm.trim()
+        var date = new Date();
+        var filename = searhterm.toLowerCase().replace(/(<|>|:|\"|\'|\\|\/|\||\?>|\*|\=|\&|;|)/gmi, "");
+        filename = filename.replace(/\s/gmi, "_")
+        return filename;
+    } catch (e) {
+        return "";
+    }
+
+}
 var c2captcha = (pageurl) => {
     return new Promise(async function(resolve) {
         var senddata = "";
-        senddata = senddata + `key=${encodeURIComponent("22bc2ed421bf61bae2c5c68962015fd0")}`;
+        senddata = senddata + `key=${encodeURIComponent(customconfig.c2captchaApiKey.trim())}`;
         senddata = senddata + `&method=${encodeURIComponent("userrecaptcha")}`;
-        senddata = senddata + `&googlekey=${encodeURIComponent("6Lfmm70ZAAAAADvPzM6OhZ8Adi40-78E-aYfc1ZS")}`;
+        senddata = senddata + `&googlekey=${encodeURIComponent(customconfig.websiteKey.trim())}`;
         senddata = senddata + `&pageurl=${encodeURIComponent(pageurl)}`;
         senddata = senddata + `&json=${encodeURIComponent("1")}`;
+        senddata = senddata + `&userAgent=${encodeURIComponent(USER_AGENT)}`;
+
         try {
             if (customconfig.captchasendproxy.toLowerCase().trim().indexOf("true") > -1 &&
                 customconfig.proxyenabled.toLowerCase().trim().indexOf("true") > -1) {
-
                 var proxydetails = "";
                 if (customconfig.p_username.trim().length > 0) {
                     proxydetails = proxydetails + customconfig.p_username.trim() + ":";
@@ -81,7 +81,8 @@ var c2captcha = (pageurl) => {
                     var port = captchaproxy.split(":")[1];
 
                     proxydetails = proxydetails + ip + ":" + port;
-                    axiosdata.proxy = proxydetails;
+
+                    senddata = senddata + `&proxy=${encodeURIComponent(proxydetails)}`;
 
                 } else {
                     errorfunc(`Invalid proxy settings.`);
@@ -108,7 +109,6 @@ var c2captcha = (pageurl) => {
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
             data: senddata
         }).then(function(response) {
-            console.log(response.data);
             try {
                 var data = JSON.parse(response.data.toLowerCase().trim());
                 if (data.status == 1 && data.request.length > 3) {
@@ -135,7 +135,7 @@ var c2captcha = (pageurl) => {
 var c2captcharesponse = (workerid) => {
     return new Promise(async function(resolve) {
         var senddata = "";
-        senddata = senddata + `key=${encodeURIComponent("22bc2ed421bf61bae2c5c68962015fd0")}`;
+        senddata = senddata + `key=${encodeURIComponent(customconfig.c2captchaApiKey.trim())}`;
         senddata = senddata + `&action=${encodeURIComponent("get")}`;
         senddata = senddata + `&id=${encodeURIComponent(workerid)}`;
         senddata = senddata + `&json=${encodeURIComponent("1")}`;
@@ -148,12 +148,13 @@ var c2captcharesponse = (workerid) => {
         }).then(function(response) {
             try {
                 var data = JSON.parse(response.data.toLowerCase().trim());
+                var data1 = JSON.parse(response.data.trim());
                 if (data.status == 0 && data.request.toLowerCase().trim() == "capcha_not_ready") {
                     resolve("waiting");
                     return false;
                 }
                 if (data.status == 1 && data.request.length > 70) {
-                    resolve(data.request.trim());
+                    resolve(data1.request.trim());
                     return false;
                 } else {
                     errorfunc("No request param provided on response");
@@ -161,12 +162,12 @@ var c2captcharesponse = (workerid) => {
                     return false;
                 }
             } catch (error) {
-                errorfunc("1." + error.message);
+                errorfunc(error.message);
                 resolve("error");
                 return false;
             }
         }).catch(function(error) {
-            errorfunc("2." + error.message);
+            errorfunc(error.message);
             resolve("error");
             return false;
         });
@@ -176,7 +177,7 @@ var c2captcharesponse = (workerid) => {
 var c2captchabalance = (pageurl) => {
     return new Promise(async function(resolve) {
         var senddata = "";
-        senddata = senddata + `key=${encodeURIComponent("22bc2ed421bf61bae2c5c68962015fd0")}`;
+        senddata = senddata + `key=${encodeURIComponent(customconfig.c2captchaApiKey.trim())}`;
         senddata = senddata + `&action=${encodeURIComponent("getbalance")}`;
         senddata = senddata + `&json=${encodeURIComponent("1")}`;
         await axios.request({
@@ -196,12 +197,12 @@ var c2captchabalance = (pageurl) => {
                     return false;
                 }
             } catch (error) {
-                errorfunc("1." + error.message);
+                errorfunc(error.message);
                 resolve("error");
                 return false;
             }
         }).catch(function(error) {
-            errorfunc("2." + error.message);
+            errorfunc(error.message);
             resolve("error");
             return false;
         });
@@ -242,7 +243,208 @@ var c2captchaworker = (pageurl) => {
     });
 }
 
+var anticaptcha = (pageurl) => {
+    return new Promise(async function(resolve) {
 
+        var senddata = {};
+        senddata.clientKey = customconfig.cAntiCaptchaApiKey.trim();
+        senddata.task = {};
+        senddata.task.websiteURL = pageurl;
+        senddata.task.websiteKey = customconfig.websiteKey.trim();
+        senddata.task.type = "RecaptchaV2TaskProxyless";
+
+        try {
+            if (customconfig.captchasendproxy.toLowerCase().trim().indexOf("true") > -1 &&
+                customconfig.proxyenabled.toLowerCase().trim().indexOf("true") > -1) {
+
+                if (customconfig.p_username.trim().length > 0) {
+
+                } else {
+                    errorfunc(`Invalid proxy settings.`);
+                    resolve("error");
+                    return false;
+                }
+                if (customconfig.p_pass.trim().length > 0) {
+
+                } else {
+                    errorfunc(`Invalid proxy settings.`);
+                    resolve("error");
+                    return false;
+                }
+
+                if (customconfig.proxy.trim().length > 7) {
+                    var captchaproxy = customconfig.proxy.toLowerCase().trim();
+                    if (captchaproxy.indexOf("http://") > -1) {
+                        captchaproxy = captchaproxy.replace("http://", "");
+                    }
+                    if (captchaproxy.indexOf("https://") > -1) {
+                        captchaproxy = captchaproxy.replace("https://", "");
+                    }
+
+                    var ip = captchaproxy.split(":")[0];
+                    var port = captchaproxy.split(":")[1];
+
+
+                    senddata.task.websiteURL = pageurl;
+                    senddata.task.proxyType = "http";
+                    senddata.task.websiteKey = customconfig.websiteKey.trim();
+                    senddata.task.type = "RecaptchaV2Task";
+
+                    senddata.task.proxyAddress = ip;
+                    senddata.task.proxyPort = port;
+                    senddata.task.proxyLogin = customconfig.p_username.trim();
+                    senddata.task.proxyPassword = customconfig.p_pass.trim();
+                    senddata.task.userAgent = USER_AGENT;
+
+
+                } else {
+                    errorfunc(`Invalid proxy settings.`);
+                    resolve("error");
+                    return false;
+                }
+
+            }
+        } catch (e) {
+            errorfunc(`Invalid proxy settings.`);
+            resolve("error");
+            return false;
+        }
+
+        await axios.request({
+            method: 'POST',
+            url: 'https://api.anti-captcha.com/createTask',
+            transformResponse: null,
+            headers: { "Content-Type": "application-json" },
+            data: JSON.stringify(senddata)
+        }).then(function(response) {
+            try {
+                var data = JSON.parse(response.data.toLowerCase().trim());
+                if (data.errorid == 0 && data.taskid.toString().length > 3) {
+                    resolve(data.taskid.toString().trim());
+                } else {
+                    errorfunc("No request param provided on response");
+                    resolve("error");
+                    return false;
+                }
+            } catch (error) {
+                errorfunc(error.message);
+                resolve("error");
+                return false;
+            }
+        }).catch(function(error) {
+            errorfunc(error.message);
+            resolve("error");
+            return false;
+        });
+    });
+}
+
+
+var anticresponse = (workerid) => {
+    return new Promise(async function(resolve) {
+        var senddata = `{"clientKey":"${customconfig.cAntiCaptchaApiKey.trim()}","taskId":${workerid.trim()}}`;
+        await axios.request({
+            method: 'POST',
+            url: 'https://api.anti-captcha.com/getTaskResult',
+            transformResponse: null,
+            headers: { "Content-Type": "application-json" },
+            data: senddata
+        }).then(function(response) {
+            try {
+                var data = JSON.parse(response.data.toLowerCase().trim());
+                var data1 = JSON.parse(response.data.trim());
+                if (data.status != null && data.status.trim() == "processing") {
+                    resolve("waiting");
+                    return false;
+                }
+                if (data.status != null && data.status.trim() == "ready") {
+                    resolve(data1.solution.gRecaptchaResponse.trim());
+                    return false;
+                } else {
+                    errorfunc("No request param provided on response");
+                    resolve("error");
+                    return false;
+                }
+            } catch (error) {
+                errorfunc(error.message);
+                resolve("error");
+                return false;
+            }
+        }).catch(function(error) {
+            errorfunc(error.message);
+            resolve("error");
+            return false;
+        });
+    });
+}
+
+var anticbalance = (pageurl) => {
+    return new Promise(async function(resolve) {
+        var senddata = {};
+        senddata.clientKey = customconfig.cAntiCaptchaApiKey.trim();
+        await axios.request({
+            method: 'POST',
+            url: 'https://api.anti-captcha.com/getBalance',
+            transformResponse: null,
+            headers: { "Content-Type": "application-json" },
+            data: JSON.stringify(senddata)
+        }).then(function(response) {
+            try {
+                var data = JSON.parse(response.data.toLowerCase().trim());
+                if (data.errorid == 0 && data.balance > 0) {
+                    resolve(data.balance.toString());
+                    return false;
+                } else {
+                    errorfunc("No request param provided on response");
+                    resolve("error");
+                    return false;
+                }
+            } catch (error) {
+                errorfunc(error.message);
+                resolve("error");
+                return false;
+            }
+        }).catch(function(error) {
+            errorfunc(error.message);
+            resolve("error");
+            return false;
+        });
+    });
+}
+
+var anticworker = (pageurl) => {
+    return new Promise(async function(resolve) {
+        if (parseFloat(await anticbalance()) < 1) {
+            errorfunc("No enough AntiCaptcha Balance. Add balance");
+            resolve("no_balance");
+            return false;
+        }
+        var jobid = await anticaptcha(pageurl);
+        await helper.sleep(30);
+        var solvedcaptcha = await anticresponse(jobid);
+        if (solvedcaptcha == "waiting") {
+            await helper.sleep(30);
+            solvedcaptcha = await anticresponse(jobid);
+        }
+        if (solvedcaptcha == "waiting") {
+            await helper.sleep(30);
+            solvedcaptcha = await anticresponse(jobid);
+        }
+        if (solvedcaptcha == "waiting") {
+            await helper.sleep(30);
+            solvedcaptcha = await anticresponse(jobid);
+        }
+
+        if (solvedcaptcha.length > 70) {
+            resolve(solvedcaptcha);
+            return false;
+        } else {
+            logger.error("AntiCaptcha solving failed.");
+            resolve("error");
+            return false;
+        }
+    });
+}
 
 const errorfunc = async(message) => {
     try {
@@ -310,36 +512,45 @@ const isCaptcha = () => {
     });
 }
 
-const captchaDetected = (numRetry) => {
-    /*
-    const spanVal =  await page.$eval('.target-holder .target', el => el.innerText);
-    let element = await page.$('your selector')
-    let value = await page.evaluate(el => el.textContent, element)
-    let value = await element.evaluate(el => el.textContent)
-    */
-
-    /*
-"https://api.wit.ai/*",
-"https://speech.googleapis.com/*",
-"https://*.speech-to-text.watson.cloud.ibm.com/*",
-"https://*.stt.speech.microsoft.com/*"
- 
-*/
-
-
+const captchaDetected = () => {
     return new Promise(async function(resolve) {
         try {
 
             await helper.sleep(5);
             var isC = await isCaptcha();
-
+            // var isC = true;
             if (!isC) {
                 resolve(true);
+                return false;
             } else {
                 logger.warn("Captcha detected");
                 var MAX_RETRIES = 4;
                 for (var i = 0, l = MAX_RETRIES; i < l; i++) {
-                    var c2worker = await c2captchaworker(isC.url);
+
+                    var isC = await isCaptcha();
+                    // var isC = true;
+                    if (!isC) {
+                        resolve(true);
+                        return false;
+                    }
+                    try {
+                        if (customconfig.captchaprovider.trim().toLowerCase().indexOf(`2captcha`) > -1) {
+                            var c2worker = await c2captchaworker(isC.url);
+                        } else if (customconfig.captchaprovider.trim().toLowerCase().indexOf(`anticaptcha`) > -1) {
+                            var c2worker = await anticworker(isC.url);
+                        } else {
+                            errorfunc(`No proper captcha defined '2captcha' | 'anticaptcha' `);
+                            resolve(false);
+                            return;
+                        }
+                    } catch (e) {
+                        errorfunc(`No proper captcha defined '2captcha' | 'anticaptcha' `);
+                        resolve(false);
+                        return;
+                    }
+
+
+
                     if (c2worker == "no_balance") {
                         errorfunc("2captcha no enough balance");
                         resolve(false);
@@ -355,10 +566,12 @@ const captchaDetected = (numRetry) => {
                         await page.reload({ waitUntil: 'networkidle2' });
                         await helper.sleep(5);
                     }
-                    //captcha is solved with proper response
-
-                    console.log(c2worker);
-                    //await helper.sleep(999999);
+                    var client = await page.target().createCDPSession();
+                    await client.send('Network.clearBrowserCookies');
+                    await client.send('Network.clearBrowserCache');
+                    await client.send('Network.setCacheDisabled', {
+                        cacheDisabled: true,
+                    });
                     await page.evaluate(({ c2worker }) => {
                         try {
                             document.getElementById("g-recaptcha-response").innerHTML = c2worker;
@@ -367,13 +580,21 @@ const captchaDetected = (numRetry) => {
                             document.querySelector(`textarea[name="g-recaptcha-response"]`).innerHTML = c2worker;
                         } catch (e) {}
                         try {
+                            document.getElementById("g-recaptcha-response").value = c2worker;
+                        } catch (e) {}
+                        try {
+                            document.querySelector(`textarea[name="g-recaptcha-response"]`).value = c2worker;
+                        } catch (e) {}
+                        try {
                             $('#nocaptcha-form').submit();
                         } catch (e) {}
                         try {
                             document.querySelectorAll(`form`)[1].submit();
                         } catch (e) {}
                     }, { c2worker });
-                    await helper.sleep(999999);
+                    logger.success("Captcha solved.");
+                    await helper.sleep(5);
+                    await page.waitForSelector(`body`);
                 }
             }
 
@@ -396,26 +617,6 @@ const captchaDetected = (numRetry) => {
 }
 
 async function dojob() {
-
-    const allrawdata = `${config.server.server.output}\\${outputpath}\\allrawdata.txt`;
-    const detectedquestion = `${config.server.server.output}\\${outputpath}\\detectedquestion.txt`;
-    //const possiblequestions = `${config.server.server.output}\\${outputpath}\\possiblequestions.txt`;
-    const allinks = `${config.server.server.output}\\${outputpath}\\allinks.txt`;
-
-
-    fs.ensureFileSync(allrawdata);
-    fs.ensureFileSync(detectedquestion);
-    //fs.ensureFileSync(possiblequestions);
-    fs.ensureFileSync(allinks);
-
-
-
-    const write_allrawdata = fs.createWriteStream(allrawdata, { flags: 'a' });
-    const write_detectedquestion = fs.createWriteStream(detectedquestion, { flags: 'a' });
-    //const write_possiblequestions = fs.createWriteStream(possiblequestions, { flags: 'a' });
-    const write_allinks = fs.createWriteStream(allinks, { flags: 'a' });
-
-
     var keywords = customconfig.seachterms.trim().toLowerCase();
     if (typeof keywords == null || keywords == null || keywords == "") {
         logger.error(`No valid keywords.`);
@@ -587,9 +788,7 @@ async function dojob() {
         }
     }
     await page.evaluateOnNewDocument(helper.headlessdetect);
-    await page.setUserAgent(
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.81 Safari/537.36'
-    )
+    await page.setUserAgent(USER_AGENT);
     await page.setCacheEnabled(false);
     await page.setDefaultTimeout(120000);
     var client = await page.target().createCDPSession();
@@ -601,80 +800,86 @@ async function dojob() {
     });
     for (var i = 0; i < urls.length; i++) {
         try {
-
-
-
-            await page.goto(`${urls[i].search}&num=50`, { waitUntil: 'networkidle2' });
+            await page.goto(urls[i].search, { waitUntil: 'networkidle2' });
             await page.waitForSelector(`body`);
             var captchaSolved = false;
-            /*for (var i = 0, l = 3; captchaSolved == true || i < l; i++) {
-                var captchaSolved = await captchaDetected();
-                if(i)
-            }*/
             captchaSolved = await captchaDetected();
             if (captchaSolved == false) {
                 errorfunc(`Captcha can't be solved.`);
+                break;
                 return false;
             }
-
             var result = await page.evaluate(body => body.innerHTML, await page.$('body'));
             var $ = cherrio.load(result);
-            var number = parseInt($(`div.pager span.page-numbers:last`).text());
-
-            if (number > 0) {
-                logger.info(`${number} pages found`);
-                urlswithpages.push({ pages: number, url: urls[i].search, key: urls[i].key });
+            var numbers = $(`div.pager a`);
+            var noresults = $(`p.no-results`).length;
+            var max = 1;
+            for (var j = 0, l = numbers.length; j < l; j++) {
+                if (max < parseInt($(numbers[j]).text())) {
+                    max = parseInt($(numbers[j]).text());
+                }
             }
+            // if one page & no results
+            if (!(noresults > 0)) {
+                if (max > 0) {
+                    logger.info(`${max} pages found`);
+                    urlswithpages.push({ pages: max, url: urls[i].search, key: urls[i].key });
+                } else {
+                    urlswithpages.push({ pages: 1, url: urls[i].search, key: urls[i].key });
+                }
+            } else {
+                logger.warn("No results found.");
+            }
+            // if no results
+
+
 
         } catch (e) {
             errorfunc(e.message);
             return false;
         }
     }
-
-    await helper.sleep(5);
+    await helper.sleep(5); //5
     console.clear();
     logger.info(`Generating urls with pages`);
-
     await helper.sleep(5);
-
-
     console.clear();
     console.log(`${logger.colors.e1.brGreen}Generated${logger.colors.e1.reset} ${logger.colors.e1.brBlue} ALL URLS${logger.colors.e1.reset}`);
-
-    await helper.sleep(7);
+    await helper.sleep(5);
 
 
 
     for (var i = 0, l = urlswithpages.length; i < l; i++) {
-        //finalurls
+
+        var filename = getFileName(urlswithpages[i].key);
+        filename = filename + "-" + new Date().toISOString().substr(0, 10) + "[Y,M,D]-" + outputpath;
+        var allrawdata = `${config.server.server.output}\\${outputpath}\\${filename}[raw].txt`;
+        var detectedquestion = `${config.server.server.output}\\${outputpath}\\${filename}[ques].txt`;
+        var allinks = `${config.server.server.output}\\${outputpath}\\${filename}[links].txt`;
+        fs.ensureFileSync(allrawdata);
+        fs.ensureFileSync(detectedquestion);
+        fs.ensureFileSync(allinks);
+        var write_allrawdata = fs.createWriteStream(allrawdata, { flags: 'a' });
+        var write_detectedquestion = fs.createWriteStream(detectedquestion, { flags: 'a' });
+        var write_allinks = fs.createWriteStream(allinks, { flags: 'a' });
+
         for (var k = 0, l3 = urlswithpages[i].pages; k < l3; k++) {
             try {
-                console.log(`${urlswithpages[i].url}&page=${(k + 1)}&pagesize=50`);
-                // await client.send('Network.clearBrowserCookies');
-                // await client.send('Network.clearBrowserCache');
-                // await client.send('Network.setCacheDisabled', {
-                //     cacheDisabled: true,
-                // });
-
+                console.log(`${urlswithpages[i].url}&page=${(k + 1)}`);
                 var checkQuestionfor = urlswithpages[i].key;
 
-                await page.goto(`${urlswithpages[i].url}&page=${(k + 1)}&pagesize=50`, { waitUntil: 'networkidle2' });
+                await page.goto(`${urlswithpages[i].url}&page=${(k + 1)}`, { waitUntil: 'networkidle2' });
                 await page.waitForSelector(`body`);
                 var captchaSolved = false;
-                /*for (var i = 0, l = 3; captchaSolved == true || i < l; i++) {
-                    var captchaSolved = await captchaDetected();
-                    if(i)
-                }*/
                 captchaSolved = await captchaDetected();
                 if (captchaSolved == false) {
                     errorfunc(`Captcha can't be solved.`);
+                    break;
                     return false;
                 }
 
                 const result = await page.evaluate(body => body.innerHTML, await page.$('body'));
                 const $ = cherrio.load(result);
-                await captchaDetected($);
 
 
 
@@ -683,7 +888,7 @@ async function dojob() {
                 var questionsDetected = [];
                 $(`div.question.search-result`).each(function() {
                     try {
-                        if ($(this).find('a').first().text().trim().length > 10) {
+                        if ($(this).find('div.summary a').first().text().trim().length > 10) {
                             let o = {}
 
                             o.TITLE = ""; //placeholder
@@ -693,7 +898,7 @@ async function dojob() {
 
                             // format title properly
                             try {
-                                o.TITLE = $(this).find('a').first().text().trim();
+                                o.TITLE = $(this).find('div.summary a').first().text().trim();
                                 o.TITLE = o.TITLE.replace(/(\r\n|\n|\r|\t|\f|\v|\v |<br>|<br\/>|<BR>|<BR\/>)/gm, " ");
                                 o.TITLE = o.TITLE.replace(/(·|—|—”|—"|—“|—')/gm, ".");
                                 o.TITLE = o.TITLE.replace(/("|“|”)/gm, "");
@@ -701,11 +906,7 @@ async function dojob() {
 
                             // format text properly 
                             try {
-                                o.TEXT = $(this).find(`div.excerpt`).text().trim();
-
-                                if (o.TEXT.indexOf("—") > -1 && o.TEXT.indexOf("—") < 25) {
-                                    o.TEXT = o.TEXT.substr(o.TEXT.indexOf("—") + 1);
-                                }
+                                o.TEXT = $(this).find(`div.summary div.excerpt`).text().trim();
                                 o.TEXT = o.TEXT.replace(/(\r\n|\n|\r|\t|\f|\v|\v |<br>|<br\/>|<BR>|<BR\/>)/gm, " ");
                                 o.TEXT = o.TEXT.replace(/(·|—|—”|—"|—“|—')/gm, ".");
                                 o.TEXT = o.TEXT.replace(/("|“|”)/gm, "");
@@ -713,9 +914,8 @@ async function dojob() {
 
                             // format link properly
                             try {
-                                o.HREF = $(this).find('a').first().attr('href').trim();
+                                o.HREF = $(this).find('div.summary a').first().attr('href').trim();
                             } catch (e) {}
-
 
                             // Add links to links folder
                             try {
@@ -787,9 +987,6 @@ async function dojob() {
                                 }
 
                             }
-
-
-                            // match lowercase strinf str.replace(str.charAt(0), "");
                         }
                     } catch (e) {
                         errorfunc(e.message);
@@ -829,7 +1026,6 @@ async function dojob() {
 
 dojob();
 async function testing() {
-
-
+    console.log(await anticworker(`https://stackexchange.com/nocaptcha?returnUrl=%2fsearch%3fq%3dhow%2baffiliate`));
 }
 //testing();

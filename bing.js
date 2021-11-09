@@ -22,15 +22,19 @@ const helper = require('./custom_modules/helper.js');
 const jquery = require('./custom_modules/jquery.js');
 const logger = require('./custom_modules/logger.js');
 const customconfig = require(`${config.server.server.config}\\bing.js`);
+var USER_AGENT = customconfig.useragent;
+const getFileName = (searhterm) => {
+    try {
+        searhterm = searhterm.trim()
+        var date = new Date();
+        var filename = searhterm.toLowerCase().replace(/(<|>|:|\"|\'|\\|\/|\||\?>|\*|\=|\&|;|)/gmi, "");
+        filename = filename.replace(/\s/gmi, "_")
+        return filename;
+    } catch (e) {
+        return "";
+    }
 
-/*
-[
-detectedquestion.txt //All detected questions with removed duplicates.
-possiblequestions.txt // all sentences that qualify for questions but don't have ? sign
-allrawdata.txt
-allinks.txt
-]
-*/
+}
 
 const errorfunc = async(message) => {
     try {
@@ -41,24 +45,6 @@ const errorfunc = async(message) => {
 }
 
 async function dojob() {
-
-    const allrawdata = `${config.server.server.output}\\${outputpath}\\allrawdata.txt`;
-    const detectedquestion = `${config.server.server.output}\\${outputpath}\\detectedquestion.txt`;
-    //const possiblequestions = `${config.server.server.output}\\${outputpath}\\possiblequestions.txt`;
-    const allinks = `${config.server.server.output}\\${outputpath}\\allinks.txt`;
-
-
-    fs.ensureFileSync(allrawdata);
-    fs.ensureFileSync(detectedquestion);
-    //fs.ensureFileSync(possiblequestions);
-    fs.ensureFileSync(allinks);
-
-
-    const write_allrawdata = fs.createWriteStream(allrawdata, { flags: 'a' });
-    const write_detectedquestion = fs.createWriteStream(detectedquestion, { flags: 'a' });
-    //const write_possiblequestions = fs.createWriteStream(possiblequestions, { flags: 'a' });
-    const write_allinks = fs.createWriteStream(allinks, { flags: 'a' });
-
 
     var keywords = customconfig.seachterms.trim().toLowerCase();
     if (typeof keywords == null || keywords == null || keywords == "") {
@@ -230,9 +216,7 @@ async function dojob() {
         }
     }
     await page.evaluateOnNewDocument(helper.headlessdetect);
-    await page.setUserAgent(
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.81 Safari/537.36'
-    )
+    await page.setUserAgent(USER_AGENT);
     await page.setCacheEnabled(false);
     await page.setDefaultTimeout(120000);
     var client = await page.target().createCDPSession();
@@ -252,13 +236,18 @@ async function dojob() {
 
             var result = await page.evaluate(body => body.innerHTML, await page.$('body'));
             var $ = cherrio.load(result);
+            var noresults = $(`li.b_no`).length;
+            if (!(noresults > 0)) {
+                var number = parseInt($(`li.b_pag a[href][aria-label].sb_bp:last`).text());
 
-            var number = parseInt($(`li.b_pag a[href][aria-label].sb_bp:last`).text());
-
-            if (number > 0) {
-                logger.info(`${number} pages found`);
-                urlswithpages.push({ pages: number, url: urls[i].search, key: urls[i].key });
+                if (number > 0) {
+                    logger.info(`${number} pages found for now`);
+                    urlswithpages.push({ pages: number, url: urls[i].search, key: urls[i].key });
+                }
+            } else {
+                logger.warn("No results found.");
             }
+
 
         } catch (e) {
             errorfunc(e.message);
@@ -282,6 +271,18 @@ async function dojob() {
 
     for (var i = 0, l = urlswithpages.length; i < l; i++) {
         //finalurls
+        var filename = getFileName(urlswithpages[i].key);
+        filename = filename + "-" + new Date().toISOString().substr(0, 10) + "[Y,M,D]-" + outputpath;
+        var allrawdata = `${config.server.server.output}\\${outputpath}\\${filename}[raw].txt`;
+        var detectedquestion = `${config.server.server.output}\\${outputpath}\\${filename}[ques].txt`;
+        var allinks = `${config.server.server.output}\\${outputpath}\\${filename}[links].txt`;
+        fs.ensureFileSync(allrawdata);
+        fs.ensureFileSync(detectedquestion);
+        fs.ensureFileSync(allinks);
+        var write_allrawdata = fs.createWriteStream(allrawdata, { flags: 'a' });
+        var write_detectedquestion = fs.createWriteStream(detectedquestion, { flags: 'a' });
+        var write_allinks = fs.createWriteStream(allinks, { flags: 'a' });
+
         for (var k = 0, l3 = urlswithpages[i].pages; k < l3; k++) {
             try {
                 console.log(`${urlswithpages[i].url}&first=${((k * 50) - 1) > 0 ? ((k * 50) - 1) : 0}&count=50`);
@@ -301,6 +302,9 @@ async function dojob() {
 
                 const result = await page.evaluate(body => body.innerHTML, await page.$('body'));
                 const $ = cherrio.load(result);
+                try {
+                    l3 = parseInt($(`li.b_pag a[href][aria-label].sb_bp:last`).text());
+                } catch (e) {}
 
 
                 var questionsDetected = [];
@@ -324,7 +328,7 @@ async function dojob() {
 
                             // format text properly 
                             try {
-                                o.TEXT = $(this).find(`p`).first().trim();
+                                o.TEXT = $(this).find(`p`).first().text().trim();
                                 if (o.TEXT.indexOf("·") > -1 && o.TEXT.indexOf("·") < 25) {
                                     o.TEXT = o.TEXT.substr(o.TEXT.indexOf("·") + 1);
                                 }

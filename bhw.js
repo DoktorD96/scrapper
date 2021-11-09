@@ -19,16 +19,19 @@ const helper = require('./custom_modules/helper.js');
 const jquery = require('./custom_modules/jquery.js');
 const logger = require('./custom_modules/logger.js');
 const customconfig = require(`${config.server.server.config}\\bhw.js`);
+var USER_AGENT = customconfig.useragent;
+const getFileName = (searhterm) => {
+    try {
+        searhterm = searhterm.trim()
+        var date = new Date();
+        var filename = searhterm.toLowerCase().replace(/(<|>|:|\"|\'|\\|\/|\||\?>|\*|\=|\&|;|)/gmi, "");
+        filename = filename.replace(/\s/gmi, "_")
+        return filename;
+    } catch (e) {
+        return "";
+    }
 
-/*
-[
-detectedquestion.txt //All detected questions with removed duplicates.
-possiblequestions.txt // all sentences that qualify for questions but don't have ? sign
-allrawdata.txt
-allinks.txt
-]
-*/
-
+}
 const errorfunc = async(message) => {
     try {
         logger.errorlog(message);
@@ -38,25 +41,6 @@ const errorfunc = async(message) => {
 }
 
 async function dojob() {
-
-    const allrawdata = `${config.server.server.output}\\${outputpath}\\allrawdata.txt`;
-    const detectedquestion = `${config.server.server.output}\\${outputpath}\\detectedquestion.txt`;
-    //const possiblequestions = `${config.server.server.output}\\${outputpath}\\possiblequestions.txt`;
-    const allinks = `${config.server.server.output}\\${outputpath}\\allinks.txt`;
-
-
-    fs.ensureFileSync(allrawdata);
-    fs.ensureFileSync(detectedquestion);
-    //fs.ensureFileSync(possiblequestions);
-    fs.ensureFileSync(allinks);
-
-
-    const write_allrawdata = fs.createWriteStream(allrawdata, { flags: 'a' });
-    const write_detectedquestion = fs.createWriteStream(detectedquestion, { flags: 'a' });
-    //const write_possiblequestions = fs.createWriteStream(possiblequestions, { flags: 'a' });
-    const write_allinks = fs.createWriteStream(allinks, { flags: 'a' });
-
-
     var keywords = customconfig.seachterms.trim().toLowerCase();
     if (typeof keywords == null || keywords == null || keywords == "") {
         logger.error(`No valid keywords.`);
@@ -241,9 +225,7 @@ async function dojob() {
         }
     }
     await page.evaluateOnNewDocument(helper.headlessdetect);
-    await page.setUserAgent(
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.81 Safari/537.36'
-    )
+    await page.setUserAgent(USER_AGENT);
     await page.setCacheEnabled(false);
     await page.setDefaultTimeout(120000);
     var client = await page.target().createCDPSession();
@@ -284,14 +266,14 @@ async function dojob() {
 
             var result = await page.evaluate(body => body.innerHTML, await page.$('body'));
             var $ = cherrio.load(result);
-
-            if ($(`div.blockMessage`).text().toLowerCase().indexOf(`no results found`) > -1) {
+            var noresults = $(`div.blockMessage`).text().toLowerCase().indexOf(`no results found`);
+            if (noresults > -1) {
                 logger.warn(`No results on page`);
             }
 
             var number = parseInt($(`nav.pageNavWrapper li.pageNav-page:last`).text());
 
-            if (number > 0) {
+            if (noresults == -1 && number > 0) {
                 logger.info(`${number} pages found`);
                 urlswithpages.push({ pages: number, url: urls[i].search, key: urls[i].key });
             }
@@ -330,6 +312,19 @@ async function dojob() {
         var checkQuestionfor = urlswithpages[i].key;
         var globalURL = "";
         for (var j = 0, l1 = urlswithpages[i].pages; j < l1; j++) {
+
+            var filename = getFileName(urlswithpages[i].key);
+            filename = filename + "-" + new Date().toISOString().substr(0, 10) + "[Y,M,D]-" + outputpath;
+            var allrawdata = `${config.server.server.output}\\${outputpath}\\${filename}[raw].txt`;
+            var detectedquestion = `${config.server.server.output}\\${outputpath}\\${filename}[ques].txt`;
+            var allinks = `${config.server.server.output}\\${outputpath}\\${filename}[links].txt`;
+            fs.ensureFileSync(allrawdata);
+            fs.ensureFileSync(detectedquestion);
+            fs.ensureFileSync(allinks);
+            var write_allrawdata = fs.createWriteStream(allrawdata, { flags: 'a' });
+            var write_detectedquestion = fs.createWriteStream(detectedquestion, { flags: 'a' });
+            var write_allinks = fs.createWriteStream(allinks, { flags: 'a' });
+
             try {
                 if (j === 0) {
 
