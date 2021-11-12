@@ -314,7 +314,7 @@ async function dojob() {
         for (var j = 0, l1 = urlswithpages[i].pages; j < l1; j++) {
 
             var filename = getFileName(urlswithpages[i].key);
-            filename = filename + "-" + new Date().toISOString().substr(0, 10) + "[Y,M,D]-" + outputpath;
+            filename = filename + "_" + outputpath;
             var allrawdata = `${config.server.server.output}\\${outputpath}\\${filename}[raw].txt`;
             var detectedquestion = `${config.server.server.output}\\${outputpath}\\${filename}[ques].txt`;
             var allinks = `${config.server.server.output}\\${outputpath}\\${filename}[links].txt`;
