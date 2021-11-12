@@ -123,7 +123,7 @@ async function dojob() {
             for (var j = 0; j < keywords.length; j++) {
                 searchterms.push({
                     search: `allintitle: "${questions[i]}"  ${keywords[j]}`,
-                    key: keywords[i]
+                    key: keywords[j]
                 });
             }
         }
