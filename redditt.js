@@ -124,7 +124,7 @@ async function dojob() {
         for (var i = 0; i < questions.length; i++) {
             for (var j = 0; j < keywords.length; j++) {
                 searchterms.push({
-                    search: `allintitle: "${questions[i]}"  ${keywords[j]}`,
+                    search: `${questions[i]}  ${keywords[j]}`,
                     key: keywords[i]
                 });
             }
