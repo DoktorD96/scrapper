@@ -21,7 +21,16 @@ const devices = require('./custom_modules/devicehelper.js');
 const helper = require('./custom_modules/helper.js');
 const jquery = require('./custom_modules/jquery.js');
 const logger = require('./custom_modules/logger.js');
-const customconfig = require(`${config.server.server.config}\\bing.js`);
+
+//# PATHS
+
+var ROOT = path.resolve(__dirname, '..');
+var CODE = path.resolve(__dirname, '../CODE');
+var CONFIG = path.resolve(__dirname, '../CONFIG');
+var OUTPUT = path.resolve(__dirname, '../OUTPUT');
+
+
+const customconfig = require(`${CONFIG}\\bing.js`);
 var USER_AGENT = customconfig.useragent;
 const getFileName = (searhterm) => {
     try {
@@ -35,6 +44,7 @@ const getFileName = (searhterm) => {
     }
 
 }
+
 
 const errorfunc = async(message) => {
     try {
@@ -273,9 +283,9 @@ async function dojob() {
         //finalurls
         var filename = getFileName(urlswithpages[i].key);
         filename = filename + "_" + outputpath;
-        var allrawdata = `${config.server.server.output}\\${outputpath}\\${filename}[raw].txt`;
-        var detectedquestion = `${config.server.server.output}\\${outputpath}\\${filename}[ques].txt`;
-        var allinks = `${config.server.server.output}\\${outputpath}\\${filename}[links].txt`;
+        var allrawdata = `${OUTPUT}\\${outputpath}\\${filename}[raw].txt`;
+        var detectedquestion = `${OUTPUT}\\${outputpath}\\${filename}[ques].txt`;
+        var allinks = `${OUTPUT}\\${outputpath}\\${filename}[links].txt`;
         fs.ensureFileSync(allrawdata);
         fs.ensureFileSync(detectedquestion);
         fs.ensureFileSync(allinks);
